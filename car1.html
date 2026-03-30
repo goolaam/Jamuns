@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Neon Racer</title>
+    <style>
+        body { background: #111; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
+        canvas { background: #222; display: block; margin: 0 auto; border-left: 5px dashed #555; border-right: 5px dashed #555; touch-action: none; }
+        .info { position: absolute; top: 10px; width: 100%; pointer-events: none; }
+        #score { font-size: 30px; font-weight: bold; color: #0cf; }
+        .controls { display: flex; justify-content: center; gap: 20px; padding: 20px; }
+        .btn { width: 80px; height: 80px; background: #333; border: 2px solid #0cf; border-radius: 10px; color: #0cf; font-size: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
+        .btn:active { background: #0cf; color: #000; }
+    </style>
+</head>
+<body>
+
+    <div class="info">
+        <div id="score">0</div>
+        <div id="msg">DODGE!</div>
+    </div>
+
+    <canvas id="road"></canvas>
+
+    <div class="controls">
+        <div class="btn" onmousedown="moveLeft()" ontouchstart="moveLeft()">◀</div>
+        <div class="btn" onmousedown="moveRight()" ontouchstart="moveRight()">▶</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("road");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score");
+
+        canvas.width = 300;
+        canvas.height = 450;
+
+        let score = 0;
+        let gameActive = true;
+        let player = { x: 125, y: 380, w: 50, h: 60, lane: 1 };
+        let obstacles = [];
+        let speed = 5;
+
+        // 3 Lanes: 0, 1, 2
+        const laneWidth = 100;
+
+        function spawnObstacle() {
+            if (!gameActive) return;
+            let lane = Math.floor(Math.random() * 3);
+            obstacles.push({
+                x: (lane * laneWidth) + 25,
+                y: -100,
+                w: 50,
+                h: 80,
+                color: `hsl(${Math.random() * 360}, 70%, 50%)`
+            });
+            // Speed up slightly as you go
+            speed += 0.1;
+        }
+
+        function moveLeft() {
+            if (player.lane > 0) player.lane--;
+        }
+
+        function moveRight() {
+            if (player.lane < 2) player.lane++;
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // Smoothly slide player to their lane
+            let targetX = (player.lane * laneWidth) + 25;
+            player.x += (targetX - player.x) * 0.2;
+
+            obstacles.forEach((obs, index) => {
+                obs.y += speed;
+
+                // Collision Check
+                if (
+                    player.x < obs.x + obs.w &&
+                    player.x + player.w > obs.x &&
+                    player.y < obs.y + obs.h &&
+                    player.y + player.h > obs.y
+                ) {
+                    gameOver();
+                }
+
+                // Remove off-screen obstacles and add score
+                if (obs.y > canvas.height) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    scoreEl.innerText = score;
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Road Lines
+            ctx.strokeStyle = "#444";
+            ctx.setLineDash([20, 20]);
+            ctx.beginPath();
+            ctx.moveTo(100, 0); ctx.lineTo(100, canvas.height);
+            ctx.moveTo(200, 0); ctx.lineTo(200, canvas.height);
+            ctx.stroke();
+
+            // Draw Player (Blue Car)
+            ctx.fillStyle = "#0cf";
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#0cf";
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+
+            // Draw Obstacles
+            ctx.shadowBlur = 0;
+            obstacles.forEach(obs => {
+                ctx.fillStyle = obs.color;
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+            });
+
+            requestAnimationFrame(() => {
+                update();
+                draw();
+            });
+        }
+
+        function gameOver() {
+            gameActive = false;
+            document.getElementById("msg").innerHTML = "<span style='color:red'>CRASHED!</span><br><button onclick='location.reload()'>Restart</button>";
+        }
+
+        // Key Listeners
+        window.addEventListener("keydown", e => {
+            if (e.key === "ArrowLeft") moveLeft();
+            if (e.key === "ArrowRight") moveRight();
+        });
+
+        setInterval(spawnObstacle, 1000);
+        draw();
+    </script>
+</body>
+</html>
