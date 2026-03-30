@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Orbit Sling</title>
+    <style>
+        body { 
+            background: #0a0a12; 
+            color: #fff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        canvas { 
+            background: radial-gradient(circle, #1b1b2f 0%, #0a0a12 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            touch-action: none;
+        }
+        .stats { position: absolute; top: 20px; text-align: center; pointer-events: none; }
+        #score { font-size: 48px; font-weight: bold; opacity: 0.5; }
+        .hint { font-size: 14px; color: #4e4e6a; text-transform: uppercase; letter-spacing: 2px; }
+        #msg { color: #ff2e63; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="stats">
+        <div id="score">0</div>
+        <div class="hint">Hold to Pull In. Release to Fly Out.</div>
+        <div id="msg"></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score");
+        const msgEl = document.getElementById("msg");
+
+        // Set canvas size based on screen
+        const size = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+        canvas.width = size;
+        canvas.height = size;
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        let score = 0;
+        let gameActive = true;
+        let isPulling = false;
+
+        // Physics Constants
+        let angle = 0;
+        let radius = size * 0.3; // Starting distance
+        let orbitalVelocity = 0.04;
+        let radialVelocity = 0;
+
+        const innerBound = size * 0.1; // Planet surface
+        const outerBound = size * 0.48; // Deep space
+
+        function update() {
+            if (!gameActive) return;
+
+            // 1. Update Angle (The circular movement)
+            angle += orbitalVelocity;
+
+            // 2. Update Radius (The physics)
+            if (isPulling) {
+                radialVelocity -= 0.5; // Gravity pull
+            } else {
+                radialVelocity += 0.4; // Centrifugal drift
+            }
+
+            // Apply friction/dampening to radial velocity
+            radialVelocity *= 0.95;
+            radius += radialVelocity;
+
+            // 3. Score Logic (One point per full rotation)
+            if (angle >= Math.PI * 2) {
+                angle = 0;
+                score++;
+                scoreEl.innerText = score;
+                orbitalVelocity += 0.001; // Get faster
+            }
+
+            // 4. Collision Logic
+            if (radius <= innerBound) {
+                endGame("CRASHED INTO THE PLANET!");
+            } else if (radius >= outerBound) {
+                endGame("LOST IN DEEP SPACE!");
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Orbit Path Hint
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Draw Center Planet
+            const gradient = ctx.createRadialGradient(centerX, centerY, 5, centerX, centerY, innerBound);
+            gradient.addColorStop(0, "#ff2e63");
+            gradient.addColorStop(1, "#08d9d6");
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, innerBound, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = "#08d9d6";
+
+            // Draw Satellite (The Player)
+            const satX = centerX + Math.cos(angle) * radius;
+            const satY = centerY + Math.sin(angle) * radius;
+
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(satX, satY, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw "Pull" Line
+            if (isPulling) {
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(satX, satY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            if (gameActive) {
+                requestAnimationFrame(() => {
+                    update();
+                    draw();
+                });
+            }
+        }
+
+        function endGame(text) {
+            gameActive = false;
+            msgEl.innerText = text;
+            msgEl.innerHTML += "<br><br><button onclick='location.reload()' style='padding: 10px 20px; background: #08d9d6; border: none; cursor: pointer; font-weight: bold;'>RETRY</button>";
+        }
+
+        // Event Listeners
+        const startPull = () => isPulling = true;
+        const endPull = () => isPulling = false;
+
+        window.addEventListener("mousedown", startPull);
+        window.addEventListener("mouseup", endPull);
+        window.addEventListener("touchstart", (e) => { e.preventDefault(); startPull(); });
+        window.addEventListener("touchend", endPull);
+        window.addEventListener("keydown", (e) => { if(e.code === "Space") startPull(); });
+        window.addEventListener("keyup", (e) => { if(e.code === "Space") endPull(); });
+
+        draw();
+    </script>
+</body>
+</html>
