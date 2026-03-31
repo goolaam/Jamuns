@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Existential Dread Simulator</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital@0;1&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            color: #ccc;
+            font-family: 'Crimson Text', serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 70vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #dandelionCanvas {
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.1));
+        }
+
+        #ui {
+            text-align: center;
+            position: absolute;
+            bottom: 10%;
+            width: 100%;
+        }
+
+        #witnessButton {
+            background-color: #222;
+            border: 1px solid #555;
+            color: #ccc;
+            padding: 12px 25px;
+            font-size: 1.2em;
+            font-family: 'Crimson Text', serif;
+            cursor: pointer;
+            transition: background-color 0.3s, border-color 0.3s;
+            border-radius: 5px;
+        }
+
+        #witnessButton:hover {
+            background-color: #333;
+            border-color: #777;
+        }
+
+        #witnessButton:active {
+            background-color: #111;
+        }
+
+        #counter {
+            margin-top: 20px;
+            font-size: 1em;
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        #end-screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #end-screen h2 {
+            font-size: 2em;
+            font-weight: normal;
+            font-style: italic;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeIn 2s ease-in-out forwards;
+            animation-delay: 1s;
+        }
+
+        #restartButton {
+            background-color: #222;
+            border: 1px solid #555;
+            color: #ccc;
+            padding: 12px 25px;
+            font-size: 1.2em;
+            font-family: 'Crimson Text', serif;
+            cursor: pointer;
+            opacity: 0;
+            animation: fadeIn 2s ease-in-out forwards;
+            animation-delay: 2s;
+            border-radius: 5px;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="dandelionCanvas"></canvas>
+    </div>
+
+    <div id="ui">
+        <button id="witnessButton">Witness</button>
+        <div id="counter">Times Witnessed: 0</div>
+    </div>
+
+    <div id="end-screen">
+        <h2>Nothing lasts.</h2>
+        <button id="restartButton">Observe again</button>
+    </div>
+
+    <audio id="chime" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBi2Gy/DaiTYIG2m98OScTgwOUarm7blmFgU7k9n1unEiBC13yO/eizEIHWq+8+OWT" type="audio/wav">
+    </audio>
+
+    <script>
+        const canvas = document.getElementById('dandelionCanvas');
+        const ctx = canvas.getContext('2d');
+        const witnessButton = document.getElementById('witnessButton');
+        const counter = document.getElementById('counter');
+        const endScreen = document.getElementById('end-screen');
+        const restartButton = document.getElementById('restartButton');
+        const chime = document.getElementById('chime');
+
+        canvas.width = 300;
+        canvas.height = 300;
+
+        let witnessCount = 0;
+        let seed = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            vx: (Math.random() - 0.5) * 0.2,
+            vy: (Math.random() - 0.5) * 0.2,
+            age: 0,
+            maxAge: 60 * 1000 // 60 seconds in milliseconds
+        };
+        
+        let animationId;
+        let startTime = Date.now();
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = Math.random() * -2 - 1;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.01 + 0.005;
+                this.size = Math.random() * 2 + 1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+                this.vy += 0.05; // gravity
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = '#ddd';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        let particles = [];
+
+        function drawDandelion() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const life = seed.age / seed.maxAge;
+            const wobble = Math.sin(Date.now() * 0.001) * 5;
+
+            // Update position
+            seed.x += seed.vx;
+            seed.y += seed.vy;
+            if (seed.x < 20 || seed.x > canvas.width - 20) seed.vx *= -1;
+            if (seed.y < 20 || seed.y > canvas.height - 20) seed.vy *= -1;
+
+            // Draw filaments (the fluffy part)
+            ctx.strokeStyle = `rgba(220, 220, 220, \${1 - life * 0.8})`;
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 20; i++) {
+                const angle = (Math.PI * 2 / 20) * i;
+                const length = 40 * (1 - life * 0.9) + Math.random() * 5 * life;
+                const endX = seed.x + Math.cos(angle) * length + wobble * life;
+                const endY = seed.y + Math.sin(angle) * length;
+
+                ctx.beginPath();
+                ctx.moveTo(seed.x, seed.y);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+
+                // Shedding particles
+                if (life > 0.4 && Math.random() < 0.01) {
+                    particles.push(new Particle(endX, endY));
+                }
+            }
+
+            // Draw central seed
+            ctx.fillStyle = `rgba(150, 150, 150, \${1 - life * 0.5})`;
+            ctx.beginPath();
+            ctx.arc(seed.x, seed.y, 5 + life * 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw blemishes
+            if (life > 0.2) {
+                ctx.fillStyle = `rgba(100, 100, 100, \${life})`;
+                for (let i = 0; i < 5; i++) {
+                    const blemish
